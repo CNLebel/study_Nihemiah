@@ -5,17 +5,18 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const gravatar = require('gravatar');
 const keys = require('../config/keys');
+const passport = require('passport');
 const User = require('../models/User');
 
-//router GET api/users/test
+//@router GET api/users/test
 //@desc 返回的请求的json数据
 //@access public
-router.get('/test',(req, res)=>{
-    res.json({msg:"Login works"})
-});
+// router.get('/test',(req, res)=>{
+//     res.json({msg:"Login works"})
+// });
 
 
-//router POST api/users/register
+//@router POST api/users/register
 //@desc 返回的请求的json数据
 //@access public
 router.post('/register',(req, res)=>{
@@ -23,7 +24,7 @@ router.post('/register',(req, res)=>{
     User.findOne({email:req.body.email})
         .then((user)=>{
             if(user){
-                return res.status(400).json({email:"邮箱已被注册!"})
+                return res.status(400).json('邮箱已被注册!')
             }else{
 
                 const  avatar = gravatar.url(req.body.email, {s: '200', r: 'pg', d: 'mm'});
@@ -32,7 +33,8 @@ router.post('/register',(req, res)=>{
                     name: req.body.name,
                     email:req.body.email,
                     avatar,
-                    password:req.body.password
+                    password: req.body.password,
+                    identity: req.body.identity
                 });
                 
                 bcrypt.genSalt(10, function(err,salt){
@@ -57,7 +59,7 @@ router.post('/register',(req, res)=>{
 
 
 
-//router POST api/users/login
+//@router POST api/users/login
 //@desc 返回token jwt passport
 //@access public
 router.post('/login',(req,res)=>{
@@ -67,23 +69,28 @@ router.post('/login',(req,res)=>{
     User.findOne({email})
         .then(user => {
             if(!user){
-                return res.status(404).json({email:"用户不存在!"});
+                return res.status(404).json('用户不存在!');
             }
 
             //密码配置
             bcrypt.compare(password, user.password,)
                   .then(isMatch =>{
                       if(isMatch){
-                          const rule = {id:user.id, name:user.name};
+                          const rule = {
+                              id: user.id, 
+                              name: user.name,
+                              avatar: user.avatar, 
+                              identity: user.identity
+                            };
                           jwt.sign(rule,keys.secretOrKey,{expiresIn:3600},(err, token)=>{
                               if (err) throw err;
                               res.json({
                                   success: true,
-                                  token: "mrwu" + token
+                                  token: "Bearer " + token
                               })
                           })
                       }else{
-                          return res.status(400).json({password:"密码错误"});
+                          return res.status(400).json('密码错误');
                       }
                   })
                   .catch(err => {
@@ -91,5 +98,20 @@ router.post('/login',(req,res)=>{
                   })
         })
 });
+
+
+
+
+//@router GET api/users/current
+//@desc return current user
+//@access Private
+router.get("/current",passport.authenticate("jwt" ,{session:false}),(req, res)=>{
+    res.json({
+        id: req.user.id,
+        name: req.user.name,
+        email: req.user.email,
+        identity: req.user.identity
+    })
+})
 
 module.exports = router;
